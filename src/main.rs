@@ -7,7 +7,8 @@ use config::{Config, ConfigPaths};
 use std::{env::args, fs, path::Path};
 use strum::IntoEnumIterator;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let mut args = args().collect::<Vec<_>>();
     if args.len() > 1 {
         // check if default subcommand is needed

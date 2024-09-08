@@ -9,9 +9,11 @@ anyhow = "1.0.87"
 clap = { version = "4.5.17", features = ["derive"] }
 directories = "5.0.1"
 edit = "0.1.5"
+russh = "0.45.0"
 scanpw = "1.0.0"
 serde = { version = "1.0.210", features = ["derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
 text_io = "0.1.12"
+tokio = "1.40.0"
 toml = "0.8.19"
 whoami = "1.5.2"
