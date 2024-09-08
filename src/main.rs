@@ -3,8 +3,8 @@ mod config;
 mod encryption;
 
 use cli::{CommandEnum, ConfigEnum, Parser};
-use config::{ Config, ConfigPaths };
-use std::env::args;
+use config::{Config, ConfigPaths};
+use std::{env::args, path::Path};
 use strum::IntoEnumIterator;
 
 fn main() {
@@ -23,6 +23,7 @@ fn main() {
     let cli: Parser = clap::Parser::parse_from(args);
     let paths = ConfigPaths::new();
     let config = Config::new(&paths.config.join("config.toml"));
+    let passfile = paths.data.join("passphrase.gpg");
     println!("{paths:#?}");
     println!("{config:#?}");
     println!("{cli:#?}");
@@ -38,12 +39,12 @@ fn main() {
         CommandEnum::Config(command) => match command {
             ConfigEnum::Init => {
                 config::create_default_dirs(&paths);
-                let passfile = paths.data.join("passphrase.gpg");
                 let passphrase = if !passfile.exists() {
                     encryption::set_passphrase(&passfile)
                 } else {
-                    encryption::decrypt(&passfile)
+                    encryption::decrypt(&passfile, None).unwrap()
                 };
+                register_credentials(&passphrase, None, &paths.data.join("credentials"));
             }
             ConfigEnum::Edit => {}
             ConfigEnum::Reset => {
@@ -53,7 +54,29 @@ fn main() {
             ConfigEnum::Passphrase => {
                 encryption::set_passphrase(&paths.data.join("passphrase.gpg"));
             }
-            ConfigEnum::Credentials { user } => {}
+            ConfigEnum::Credentials { user } => {
+                register_credentials(
+                    &encryption::decrypt(&passfile, None).unwrap(),
+                    user,
+                    &paths.data.join("credentials"),
+                );
+            }
         },
     }
+}
+
+fn register_credentials(passphrase: &str, user: Option<String>, dir: &Path) -> String {
+    let user: String = user.unwrap_or_else(|| {
+        print!("Enter user to register credentials: ");
+        text_io::read!("{}\n")
+    });
+    let file = dir.join(&user);
+    let buffer = if let Some(str) = encryption::decrypt(&file, Some(passphrase)) {
+        str
+    } else {
+        "".to_string()
+    };
+    let data = edit::edit(buffer).expect("Cannot get data from default editor");
+    encryption::encrypt(passphrase, data.as_bytes(), &file);
+    user
 }

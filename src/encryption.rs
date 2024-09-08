@@ -1,5 +1,4 @@
 use core::panic;
-use gpgme::{Context, Protocol};
 use scanpw::scanpw;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -19,11 +18,10 @@ pub fn set_passphrase(passfile: &PathBuf) -> String {
         }
     }
     encrypt(pass1.trim(), pass1.trim().as_bytes(), passfile);
-    decrypt(passfile).trim().to_string()
+    decrypt(passfile, None).unwrap()
 }
 
 pub fn encrypt(passphrase: &str, data: &[u8], file: &PathBuf) {
-    // can't get gpg me to not ask for password
     let mut child = Command::new("gpg")
         .arg("--batch")
         .arg("--passphrase")
@@ -42,11 +40,17 @@ pub fn encrypt(passphrase: &str, data: &[u8], file: &PathBuf) {
             .expect("Failed to write to stdin");
     });
     let output = child.wait_with_output().expect("Failed to read stdout");
-    if !output.stderr.is_empty() {
-        panic!(
-            "Encryption failed: {0}",
-            String::from_utf8(output.stderr).unwrap()
-        );
+    if !output.status.success() {
+        panic!("{0}", String::from_utf8(output.stderr).unwrap());
+    }
+    let parent = file.parent().unwrap();
+    if !parent.exists() {
+        match fs::create_dir_all(parent) {
+            Ok(_) => {}
+            Err(error) => {
+                panic!("Unable to create parent dirs: {error}")
+            }
+        }
     }
     match fs::write(file, output.stdout) {
         Ok(_) => {}
@@ -56,14 +60,28 @@ pub fn encrypt(passphrase: &str, data: &[u8], file: &PathBuf) {
     }
 }
 
-pub fn decrypt(file: &PathBuf) -> String {
-    let mut context =
-        Context::from_protocol(Protocol::OpenPgp).expect("Was not able to create OpenPGP context");
-    let mut text = Vec::new();
-    match context.decrypt(fs::read(file).unwrap(), &mut text) {
-        Ok(_) => String::from_utf8(text).unwrap(),
-        Err(error) => {
-            panic!("Decryption failed: {error}")
-        }
+pub fn decrypt(file: &PathBuf, passphrase: Option<&str>) -> Option<String> {
+    if !file.exists() {
+        return None;
     }
+    let output = if let Some(passphrase) = passphrase {
+        Command::new("gpg")
+            .arg("--batch")
+            .arg("--passphrase")
+            .arg(passphrase)
+            .arg("--decrypt")
+            .arg(file)
+            .output()
+            .expect("Failed to spawn gpg process")
+    } else {
+        Command::new("gpg")
+            .arg("--decrypt")
+            .arg(file)
+            .output()
+            .expect("Failed to spawn gpg process")
+    };
+    if !output.status.success() {
+        panic!("{0}", String::from_utf8(output.stderr).unwrap());
+    }
+    Some(String::from_utf8(output.stdout).unwrap())
 }
