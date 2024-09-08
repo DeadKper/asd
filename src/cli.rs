@@ -119,8 +119,6 @@ pub enum ConfigEnum {
     Credentials { user: Option<String> },
     /// Set/change passphrase (use migrate if you didn't migrate manually)
     Passphrase,
-    /// Migrate files with previous password to a new password
-    Migrate,
     /// Open config file
     Edit,
     /// Reset config file to the base configuration

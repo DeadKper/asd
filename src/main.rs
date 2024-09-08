@@ -4,7 +4,7 @@ mod encryption;
 
 use cli::{CommandEnum, ConfigEnum, Parser};
 use config::{Config, ConfigPaths};
-use std::{env::args, path::Path};
+use std::{env::args, fs, path::Path};
 use strum::IntoEnumIterator;
 
 fn main() {
@@ -46,11 +46,18 @@ fn main() {
                 };
                 register_credentials(&passphrase, None, &paths.data.join("credentials"));
             }
-            ConfigEnum::Edit => {}
+            ConfigEnum::Edit => {
+                let path = paths.config.join("config.toml");
+                if !path.exists() {
+                    Config::reset(&path);
+                }
+                let config = edit::edit(fs::read_to_string(&path).unwrap())
+                    .expect("Cannot read config file");
+                fs::write(&path, config.as_bytes()).expect("Unable to write changes");
+            }
             ConfigEnum::Reset => {
                 Config::reset(&paths.config.join("config.toml"));
             }
-            ConfigEnum::Migrate => {}
             ConfigEnum::Passphrase => {
                 encryption::set_passphrase(&paths.data.join("passphrase.gpg"));
             }
