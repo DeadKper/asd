@@ -2,7 +2,7 @@ mod cli;
 mod config;
 
 use cli::{CommandEnum, ConfigEnum, Parser};
-use config::Config;
+use config::{ Config, ConfigPaths };
 use std::env::args;
 use strum::IntoEnumIterator;
 
@@ -20,7 +20,9 @@ fn main() {
         }
     }
     let cli: Parser = clap::Parser::parse_from(args);
-    let config = Config::new();
+    let paths = ConfigPaths::new();
+    let config = Config::new(&paths.config.join("config.toml"));
+    println!("{paths:#?}");
     println!("{config:#?}");
     println!("{cli:#?}");
 
@@ -33,10 +35,12 @@ fn main() {
         CommandEnum::Exec(args) => {}
         CommandEnum::Book(args) => {}
         CommandEnum::Config(command) => match command {
-            ConfigEnum::Init => { }
-            ConfigEnum::File => {}
+            ConfigEnum::Init => {
+                config::create_default_dirs(paths);
+            }
+            ConfigEnum::Edit => {}
             ConfigEnum::Reset => {
-                Config::reset();
+                Config::reset(&paths.config.join("config.toml"));
             }
             ConfigEnum::Migrate => {}
             ConfigEnum::Passphrase => {}

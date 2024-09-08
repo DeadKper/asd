@@ -122,7 +122,7 @@ pub enum ConfigEnum {
     /// Migrate files with previous password to a new password
     Migrate,
     /// Open config file
-    File,
+    Edit,
     /// Reset config file to the base configuration
     Reset,
 }
