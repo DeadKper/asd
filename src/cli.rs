@@ -6,17 +6,17 @@ use strum::{Display, EnumIter};
 #[command(author, version, about, long_about = None)]
 pub struct Parser {
     #[command(subcommand)]
-    pub command: Command,
-    /// Quiet mode. Causes most warning and diagnostic messages to be suppressed.
+    pub command: CommandEnum,
+    /// Quiet mode. Causes most warning and diagnostic messages to be suppressed
     #[arg(short, long, global = true, conflicts_with = "verbose")]
     pub quiet: bool,
-    /// Verbose mode. Causes asd to print debugging messages about its progress.
+    /// Verbose mode. Causes asd to print debugging messages
     #[arg(short, long, global = true, conflicts_with = "quiet")]
     pub verbose: bool,
 }
 
 #[derive(Debug, Subcommand, EnumIter, Display)]
-pub enum Command {
+pub enum CommandEnum {
     /// Open SSH connection to given remote [default]
     Ssh(ConnectionArgs),
     /// Open SFTP connection to given remote
@@ -31,7 +31,7 @@ pub enum Command {
     Book(PlaybookArgs),
     /// Configure application
     #[command(subcommand)]
-    Config(Config),
+    Config(ConfigEnum),
 }
 
 #[derive(Debug, Args, Default)]
@@ -99,7 +99,7 @@ pub struct PlaybookArgs {
 }
 
 #[derive(Debug, Subcommand, Default)]
-pub enum Config {
+pub enum ConfigEnum {
     /// Initialize configuration and create neccesary folders
     #[default]
     Init,
