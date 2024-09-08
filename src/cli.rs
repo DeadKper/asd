@@ -7,12 +7,6 @@ use strum::{Display, EnumIter};
 pub struct Parser {
     #[command(subcommand)]
     pub command: CommandEnum,
-    /// Quiet mode. Causes most warning and diagnostic messages to be suppressed
-    #[arg(short, long, global = true, conflicts_with = "verbose")]
-    pub quiet: bool,
-    /// Verbose mode. Causes asd to print debugging messages
-    #[arg(short, long, global = true, conflicts_with = "quiet")]
-    pub verbose: bool,
 }
 
 #[derive(Debug, Subcommand, EnumIter, Display)]
@@ -53,6 +47,12 @@ pub struct ConnectionArgs {
     /// Print password (implies --dry-run)
     #[arg(short, long)]
     pub print: bool,
+    /// Quiet mode. Causes most warning and diagnostic messages to be suppressed
+    #[arg(short, long, conflicts_with = "verbose")]
+    pub quiet: bool,
+    /// Verbose mode. Causes asd to print debugging messages
+    #[arg(short, long, conflicts_with = "quiet")]
+    pub verbose: bool,
 }
 
 #[derive(Debug, Args, Default)]
@@ -77,6 +77,12 @@ pub struct ExecuteArgs {
     /// Commands to send to the remote
     #[arg(short, long, allow_hyphen_values = true, group = "required")]
     pub commands: Option<Vec<String>>,
+    /// Quiet mode. Causes most warning and diagnostic messages to be suppressed
+    #[arg(short, long, conflicts_with = "verbose")]
+    pub quiet: bool,
+    /// Verbose mode. Causes asd to print debugging messages
+    #[arg(short, long, conflicts_with = "quiet")]
+    pub verbose: bool,
 }
 
 #[derive(Debug, Args, Default)]
@@ -86,6 +92,12 @@ pub struct FileArgs {
     pub inventory: String,
     /// Files to send to the remotes
     pub files: Vec<PathBuf>,
+    /// Quiet mode. Causes most warning and diagnostic messages to be suppressed
+    #[arg(short, long, conflicts_with = "verbose")]
+    pub quiet: bool,
+    /// Verbose mode. Causes asd to print debugging messages
+    #[arg(short, long, conflicts_with = "quiet")]
+    pub verbose: bool,
 }
 
 #[derive(Debug, Args, Default)]
