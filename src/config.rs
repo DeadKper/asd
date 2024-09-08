@@ -1,3 +1,4 @@
+use core::panic;
 use directories::{ProjectDirs, UserDirs};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -38,17 +39,12 @@ impl Config {
     pub fn save(&self, path: &PathBuf) {
         let dir_path = std::path::Path::new(path).parent().unwrap();
         if !dir_path.exists() {
-            match fs::create_dir_all(dir_path) {
+            println!("Config dir doesn't exists!, use: asd config init");
+        } else {
+            match fs::write(path, toml::to_string_pretty(self).unwrap()) {
                 Ok(_) => {}
-                Err(error) => {
-                    println!("{error}");
-                    return;
-                }
-            };
-        }
-        match fs::write(path, toml::to_string_pretty(self).unwrap()) {
-            Ok(_) => {}
-            Err(error) => println!("Error saving config file: {error}"),
+                Err(error) => println!("Error saving config file: {error}"),
+            }
         }
     }
 }
@@ -61,7 +57,8 @@ impl Default for Config {
             "NUL"
         } else {
             "/dev/null"
-        }.to_string();
+        }
+        .to_string();
         Self {
             ssh_options: [
                 "BatchMode=no",
@@ -123,7 +120,7 @@ impl ConfigPaths {
     }
 }
 
-fn create_dir(path: PathBuf) {
+fn create_dir(path: &PathBuf) {
     if !path.exists() {
         match fs::create_dir_all(path) {
             Ok(_) => {}
@@ -134,12 +131,12 @@ fn create_dir(path: PathBuf) {
     }
 }
 
-pub fn create_default_dirs(paths: ConfigPaths) {
-    create_dir(paths.data);
-    create_dir(paths.config);
-    create_dir(paths.state);
-    create_dir(paths.cache);
-    create_dir(paths.tmp);
-    create_dir(paths.document);
-    create_dir(paths.download);
+pub fn create_default_dirs(paths: &ConfigPaths) {
+    create_dir(&paths.data);
+    create_dir(&paths.config);
+    create_dir(&paths.state);
+    create_dir(&paths.cache);
+    create_dir(&paths.tmp);
+    create_dir(&paths.document);
+    create_dir(&paths.download);
 }

@@ -5,8 +5,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.87"
 clap = { version = "4.5.17", features = ["derive"] }
 directories = "5.0.1"
+gpgme = "0.11.0"
+scanpw = "1.0.0"
 serde = { version = "1.0.210", features = ["derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
 toml = "0.8.19"

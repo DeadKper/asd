@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod encryption;
 
 use cli::{CommandEnum, ConfigEnum, Parser};
 use config::{ Config, ConfigPaths };
@@ -36,14 +37,22 @@ fn main() {
         CommandEnum::Book(args) => {}
         CommandEnum::Config(command) => match command {
             ConfigEnum::Init => {
-                config::create_default_dirs(paths);
+                config::create_default_dirs(&paths);
+                let passfile = paths.data.join("passphrase.gpg");
+                let passphrase = if !passfile.exists() {
+                    encryption::set_passphrase(&passfile)
+                } else {
+                    encryption::decrypt(&passfile)
+                };
             }
             ConfigEnum::Edit => {}
             ConfigEnum::Reset => {
                 Config::reset(&paths.config.join("config.toml"));
             }
             ConfigEnum::Migrate => {}
-            ConfigEnum::Passphrase => {}
+            ConfigEnum::Passphrase => {
+                encryption::set_passphrase(&paths.data.join("passphrase.gpg"));
+            }
             ConfigEnum::Credentials { user } => {}
         },
     }
