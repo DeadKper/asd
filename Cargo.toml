@@ -1,6 +1,9 @@
 [package]
+authors = ["Jorge Missael Gastelum Arias"]
 name = "asd"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.5.17", features = ["derive"] }
+strum = { version = "0.26.3", features = ["derive"] }
