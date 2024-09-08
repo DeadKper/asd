@@ -2,7 +2,7 @@ use core::panic;
 use directories::{ProjectDirs, UserDirs};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::{fs, path::Path, path::PathBuf};
+use std::{fs, path::PathBuf};
 use whoami::Platform;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -90,7 +90,6 @@ pub struct ConfigPaths {
     pub data: PathBuf,
     pub state: PathBuf,
     pub cache: PathBuf,
-    pub tmp: PathBuf,
     pub document: PathBuf,
     pub download: PathBuf,
 }
@@ -100,7 +99,6 @@ impl ConfigPaths {
         let proj_dirs = ProjectDirs::from("com.deadkper", "Coppel", "asd")
             .unwrap_or_else(|| panic!("was not able to set project dirs"));
         let user_dirs = UserDirs::new().unwrap();
-        let tmp = Path::new("/tmp").to_owned();
         Self {
             data: proj_dirs.data_dir().to_owned(),
             config: proj_dirs.config_dir().to_owned(),
@@ -109,11 +107,6 @@ impl ConfigPaths {
                 .unwrap_or(&proj_dirs.data_local_dir().join("state"))
                 .to_owned(),
             cache: proj_dirs.cache_dir().to_owned(),
-            tmp: if tmp.exists() {
-                tmp
-            } else {
-                proj_dirs.cache_dir().join("tmp")
-            },
             document: user_dirs.document_dir().unwrap().to_owned(),
             download: user_dirs.download_dir().unwrap().to_owned(),
         }
@@ -136,7 +129,6 @@ pub fn create_default_dirs(paths: &ConfigPaths) {
     create_dir(&paths.config);
     create_dir(&paths.state);
     create_dir(&paths.cache);
-    create_dir(&paths.tmp);
     create_dir(&paths.document);
     create_dir(&paths.download);
 }
