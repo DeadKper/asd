@@ -32,6 +32,9 @@ pub enum CommandEnum {
 pub struct ConnectionArgs {
     /// Remote to connect to
     pub remote: String,
+    /// Login user to use for the connection
+    #[arg(short, long)]
+    pub login_name: String,
     /// Ask for connection password
     #[arg(short = 'k', long)]
     pub ask_pass: bool,
@@ -45,7 +48,7 @@ pub struct ConnectionArgs {
     #[arg(short = 'u', long)]
     pub dry_run: bool,
     /// Print password (implies --dry-run)
-    #[arg(short, long)]
+    #[arg(short = 'n', long)]
     pub print: bool,
     /// Quiet mode. Causes most warning and diagnostic messages to be suppressed
     #[arg(short, long, conflicts_with = "verbose")]
@@ -56,8 +59,8 @@ pub struct ConnectionArgs {
 }
 
 #[derive(Debug, Args, Default)]
-#[clap(group( ArgGroup::new("required") .required(true)))]
-#[clap(group( ArgGroup::new("exec") .required(false)))]
+#[clap(group(ArgGroup::new("required").required(true)))]
+#[clap(group(ArgGroup::new("exec").required(false)))]
 pub struct ExecuteArgs {
     /// Specify inventory host path or comma separated host list
     #[arg(short, long)]
@@ -77,6 +80,9 @@ pub struct ExecuteArgs {
     /// Commands to send to the remote
     #[arg(short, long, allow_hyphen_values = true, group = "required")]
     pub commands: Option<Vec<String>>,
+    /// Do not connect to the remote; merely test the connection
+    #[arg(short = 'u', long, group = "required")]
+    pub dry_run: bool,
     /// Quiet mode. Causes most warning and diagnostic messages to be suppressed
     #[arg(short, long, conflicts_with = "verbose")]
     pub quiet: bool,
