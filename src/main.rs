@@ -42,7 +42,8 @@ async fn main() -> anyhow::Result<()> {
         CommandEnum::Book(args) => {}
         CommandEnum::Config(command) => match command {
             ConfigEnum::Init => {
-                let mut config = Config::new(&paths.config.join("config.toml"));
+                let config_path = paths.config.join("config.toml");
+                let mut config = Config::new(&config_path);
                 config::create_default_dirs(&paths);
                 let passphrase = if !passfile.exists() {
                     encryption::set_passphrase(&passfile)?
@@ -54,7 +55,8 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     Some(config.default_login_user)
                 };
-                register_credentials(&passphrase, user, &paths.data.join("credentials"));
+                config.default_login_user = register_credentials(&passphrase, user, &paths.data.join("credentials"))?;
+                config.save(&config_path)?;
             }
             ConfigEnum::Edit => {
                 let path = paths.config.join("config.toml");
