@@ -35,17 +35,17 @@ pub struct ConnectionArgs {
     /// Login user to use for the connection
     #[arg(short, long)]
     pub login_name: Option<String>,
-    /// Ask for connection password
-    #[arg(short = 'k', long)]
-    pub ask_pass: bool,
     /// Port to use for the connection
     #[arg(short, long)]
     pub port: Option<u16>,
+    /// Ask for connection password
+    #[arg(short = 'k', long, conflicts_with = "cache", conflicts_with = "force")]
+    pub ask_pass: bool,
     /// Disabled password renewal (and connectivity test in case of --dry-run)
-    #[arg(short, long)]
+    #[arg(short, long, conflicts_with = "ask_pass", conflicts_with = "force")]
     pub cache: bool,
     /// Force password renewal, invalidating cache
-    #[arg(short, long)]
+    #[arg(short, long, conflicts_with = "ask_pass", conflicts_with = "cache")]
     pub force: bool,
     /// Do not connect to the remote; merely test the connection
     #[arg(short = 'u', long)]
