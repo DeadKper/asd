@@ -101,7 +101,11 @@ fn register_credentials(
     });
     let file = dir.join(&user);
     let buffer = encryption::decrypt(&file, Some(passphrase)).unwrap_or("".to_string());
-    let data = edit::edit(buffer)?;
-    encryption::encrypt(passphrase, data.as_bytes(), &file)?;
+    let data = edit::edit(&buffer)?;
+    if buffer == data {
+        println!("asd: {file:#?} unchanged")
+    } else {
+        encryption::encrypt(passphrase, data.as_bytes(), &file)?;
+    }
     Ok(user)
 }
