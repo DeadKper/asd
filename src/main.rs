@@ -2,13 +2,20 @@ mod cli;
 mod config;
 mod encryption;
 
+use anyhow::Ok;
 use cli::{CommandEnum, ConfigEnum, Parser};
 use config::{Config, ConfigPaths};
-use std::{env::args, fs, path::Path};
+use core::panic;
+use std::{
+    env::args,
+    fs,
+    io::{self, Write},
+    path::Path,
+};
 use strum::IntoEnumIterator;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let mut args = args().collect::<Vec<_>>();
     if args.len() > 1 {
         // check if default subcommand is needed
@@ -41,9 +48,9 @@ async fn main() {
             ConfigEnum::Init => {
                 config::create_default_dirs(&paths);
                 let passphrase = if !passfile.exists() {
-                    encryption::set_passphrase(&passfile)
+                    encryption::set_passphrase(&passfile)?
                 } else {
-                    encryption::decrypt(&passfile, None).unwrap()
+                    encryption::decrypt(&passfile, None)?
                 };
                 register_credentials(&passphrase, None, &paths.data.join("credentials"));
             }
@@ -52,9 +59,8 @@ async fn main() {
                 if !path.exists() {
                     Config::reset(&path);
                 }
-                let config = edit::edit(fs::read_to_string(&path).unwrap())
-                    .expect("Cannot read config file");
-                fs::write(&path, config.as_bytes()).expect("Unable to write changes");
+                let config = edit::edit(fs::read_to_string(&path)?)?;
+                fs::write(&path, config.as_bytes())?;
             }
             ConfigEnum::Reset => {
                 Config::reset(&paths.config.join("config.toml"));
@@ -64,16 +70,21 @@ async fn main() {
             }
             ConfigEnum::Credentials { user } => {
                 register_credentials(
-                    &encryption::decrypt(&passfile, None).unwrap(),
+                    &encryption::decrypt(&passfile, None)?,
                     user,
                     &paths.data.join("credentials"),
                 );
             }
         },
     }
+    Ok(())
 }
 
-fn register_credentials(passphrase: &str, user: Option<String>, dir: &Path) -> String {
+fn register_credentials(
+    passphrase: &str,
+    user: Option<String>,
+    dir: &Path,
+) -> anyhow::Result<String> {
     let user: String = user.unwrap_or_else(|| {
         print!("Enter user to register credentials: ");
         io::stdout()
@@ -86,12 +97,8 @@ fn register_credentials(passphrase: &str, user: Option<String>, dir: &Path) -> S
         buffer
     });
     let file = dir.join(&user);
-    let buffer = if let Some(str) = encryption::decrypt(&file, Some(passphrase)) {
-        str
-    } else {
-        "".to_string()
-    };
-    let data = edit::edit(buffer).expect("Cannot get data from default editor");
-    encryption::encrypt(passphrase, data.as_bytes(), &file);
-    user
+    let buffer = encryption::decrypt(&file, Some(passphrase)).unwrap_or("".to_string());
+    let data = edit::edit(buffer)?;
+    encryption::encrypt(passphrase, data.as_bytes(), &file)?;
+    Ok(user)
 }

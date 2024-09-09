@@ -1,3 +1,4 @@
+use anyhow::Ok;
 use core::panic;
 use directories::{ProjectDirs, UserDirs};
 use serde::{Deserialize, Serialize};
@@ -17,35 +18,29 @@ pub struct Config {
 impl Config {
     pub fn new(path: &PathBuf) -> Self {
         if path.exists() {
-            Config::load(path)
+            Config::load(path).unwrap_or_default()
         } else {
-            Config::reset(path)
+            Config::reset(path).unwrap_or_default()
         }
     }
 
-    pub fn load(path: &PathBuf) -> Self {
-        toml::from_str::<Config>(&fs::read_to_string(path).unwrap()).unwrap_or_else(|_| {
-            println!("Failed to parse config file, using default configuration");
-            Config::default()
-        })
+    fn load(path: &PathBuf) -> anyhow::Result<Self> {
+        Ok(toml::from_str::<Config>(&fs::read_to_string(path)?)?)
     }
 
-    pub fn reset(path: &PathBuf) -> Self {
+    pub fn reset(path: &PathBuf) -> anyhow::Result<Self> {
         let config = Config::default();
-        config.save(path);
-        config
+        config.save(path)?;
+        Ok(config)
     }
 
-    pub fn save(&self, path: &PathBuf) {
+    pub fn save(&self, path: &PathBuf) -> anyhow::Result<()> {
         let dir_path = std::path::Path::new(path).parent().unwrap();
         if !dir_path.exists() {
-            println!("Config dir doesn't exists!, use: asd config init");
-        } else {
-            match fs::write(path, toml::to_string_pretty(self).unwrap()) {
-                Ok(_) => {}
-                Err(error) => println!("Error saving config file: {error}"),
-            }
+            fs::create_dir_all(dir_path)?;
         }
+        fs::write(path, toml::to_string_pretty(self)?)?;
+        Ok(())
     }
 }
 
@@ -113,22 +108,19 @@ impl ConfigPaths {
     }
 }
 
-fn create_dir(path: &PathBuf) {
+fn create_dir(path: &PathBuf) -> anyhow::Result<()> {
     if !path.exists() {
-        match fs::create_dir_all(path) {
-            Ok(_) => {}
-            Err(error) => {
-                println!("{error}");
-            }
-        };
+        fs::create_dir_all(path)?
     }
+    Ok(())
 }
 
-pub fn create_default_dirs(paths: &ConfigPaths) {
-    create_dir(&paths.data);
-    create_dir(&paths.config);
-    create_dir(&paths.state);
-    create_dir(&paths.cache);
-    create_dir(&paths.document);
-    create_dir(&paths.download);
+pub fn create_default_dirs(paths: &ConfigPaths) -> anyhow::Result<()> {
+    create_dir(&paths.data)?;
+    create_dir(&paths.config)?;
+    create_dir(&paths.state)?;
+    create_dir(&paths.cache)?;
+    create_dir(&paths.document)?;
+    create_dir(&paths.download)?;
+    Ok(())
 }
