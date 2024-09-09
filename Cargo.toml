@@ -1,6 +1,9 @@
 [package]
-authors = ["Jorge Missael Gastelum Arias"]
 name = "asd"
+description = "SSH/SFTP password automation"
+authors = ["Missael Gastelum <missga@proton.me>"]
+repository = "https://github.com/deadkper/asd.git"
+license = "MIT"
 version = "0.1.0"
 edition = "2021"
 
