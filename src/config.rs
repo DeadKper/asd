@@ -74,7 +74,7 @@ impl Default for Config {
 
 #[allow(unused)]
 #[derive(Debug)]
-pub struct ConfigPaths {
+pub struct ConfigDirs {
     pub config: PathBuf,
     pub data: PathBuf,
     pub state: PathBuf,
@@ -83,7 +83,7 @@ pub struct ConfigPaths {
     pub download: PathBuf,
 }
 
-impl ConfigPaths {
+impl ConfigDirs {
     pub fn new() -> Self {
         let proj_dirs = ProjectDirs::from("com.deadkper", "Coppel", "asd")
             .unwrap_or_else(|| panic!("was not able to set project dirs"));

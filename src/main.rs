@@ -2,14 +2,17 @@ mod cli;
 mod config;
 mod encryption;
 
+use anyhow::Ok;
 use cli::{CommandEnum, ConfigEnum, ConnectionArgs, Parser};
-use config::{Config, ConfigPaths};
+use config::{Config, ConfigDirs};
 use core::panic;
+use glob::glob;
+use scanpw::scanpw;
 use std::{
     env::args,
     fs,
     io::{self, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 use strum::IntoEnumIterator;
 
@@ -28,13 +31,18 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     let cli: Parser = clap::Parser::parse_from(args);
-    let paths = ConfigPaths::new();
-    let passfile = paths.data.join("passphrase.gpg");
-    let config_path = paths.config.join("config.toml");
+    let dirs = ConfigDirs::new();
+    let passfile = dirs.data.join("passphrase.gpg");
+    let config_path = dirs.config.join("config.toml");
 
     match cli.command {
         CommandEnum::Ssh(args) => {
-            ssh(&args, &Config::new(&config_path))?;
+            ssh(
+                &encryption::decrypt(&passfile, None)?,
+                &args,
+                &Config::new(&config_path),
+                &dirs,
+            )?;
         }
         CommandEnum::Sftp(_args) => {}
         CommandEnum::Put(_args) => {}
@@ -55,11 +63,11 @@ async fn main() -> anyhow::Result<()> {
                     Some(config.default_login_user)
                 };
                 config.default_login_user =
-                    register_credentials(&passphrase, user, &paths.data.join("credentials"))?;
+                    register_credentials(&passphrase, user, &dirs.data.join("credentials"))?;
                 config.save(&config_path)?;
             }
             ConfigEnum::Edit => {
-                let path = paths.config.join("config.toml");
+                let path = dirs.config.join("config.toml");
                 if !path.exists() {
                     Config::reset(&path)?;
                 }
@@ -72,16 +80,16 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
             ConfigEnum::Reset => {
-                Config::reset(&paths.config.join("config.toml"))?;
+                Config::reset(&dirs.config.join("config.toml"))?;
             }
             ConfigEnum::Passphrase => {
-                encryption::set_passphrase(&paths.data.join("passphrase.gpg"))?;
+                encryption::set_passphrase(&dirs.data.join("passphrase.gpg"))?;
             }
             ConfigEnum::Credentials { user } => {
                 register_credentials(
                     &encryption::decrypt(&passfile, None)?,
                     user,
-                    &paths.data.join("credentials"),
+                    &dirs.data.join("credentials"),
                 )?;
             }
         },
@@ -116,6 +124,95 @@ fn register_credentials(
     Ok(user)
 }
 
-fn ssh(_args: &ConnectionArgs, _config: &Config) -> anyhow::Result<()> {
+fn get_cached_password(
+    passphrase: &str,
+    args: &ConnectionArgs,
+    config: &Config,
+    dirs: &ConfigDirs,
+) -> anyhow::Result<String> {
+    if args.ask_pass {
+        let pass = scanpw!("Password: ");
+        println!();
+        return Ok(pass.trim().to_owned());
+    }
+    let user = args
+        .login_name
+        .clone()
+        .unwrap_or(config.default_login_user.clone());
+    let port = args.port.unwrap_or(config.default_login_port);
+    let cached_credentials = dirs.state.join(format!("{user}@{}:{port}", args.remote));
+    if cached_credentials.exists() {
+        return encryption::decrypt(&cached_credentials, Some(passphrase));
+    }
+    let user_glob = if args.login_name.is_some() {
+        &user
+    } else {
+        "*"
+    };
+    let port_glob = if args.port.is_some() {
+        &port.to_string()
+    } else {
+        "*"
+    };
+    let files: Vec<PathBuf> = glob(
+        dirs.state
+            .join(format!("{}@{}:{}", user_glob, args.remote, port_glob))
+            .into_os_string()
+            .to_str()
+            .unwrap(),
+    )?
+    .map(|x| x.unwrap())
+    .collect();
+    let credentials = dirs.data.join("credentials").join(&user);
+    if files.is_empty() {
+        if credentials.exists() {
+            // TODO: password detection
+            encryption::decrypt(&credentials, Some(passphrase))
+        } else {
+            let pass = scanpw!("Password: ");
+            println!();
+            Ok(pass.trim().to_owned())
+        }
+    } else {
+        let prefix_path = dirs
+            .state
+            .join(format!("{user}@"))
+            .into_os_string()
+            .into_string()
+            .unwrap();
+        let cached: Vec<PathBuf> = files
+            .clone()
+            .into_iter()
+            .filter(|file| {
+                file.file_name()
+                    .unwrap()
+                    .to_os_string()
+                    .into_string()
+                    .unwrap()
+                    .starts_with(&prefix_path)
+            })
+            .collect();
+        if !cached.is_empty() {
+            encryption::decrypt(&cached[0], Some(passphrase))
+        } else {
+            encryption::decrypt(&files[0], Some(passphrase))
+        }
+    }
+}
+
+fn ssh(
+    passphrase: &str,
+    args: &ConnectionArgs,
+    config: &Config,
+    dirs: &ConfigDirs,
+) -> anyhow::Result<()> {
+    let user = args
+        .login_name
+        .clone()
+        .unwrap_or(config.default_login_user.clone());
+    let port = args.port.unwrap_or(config.default_login_port);
+    let cached_credentials = dirs.state.join(format!("{user}@{}:{port}", args.remote));
+    let password = get_cached_password(passphrase, args, config, dirs)?;
+    encryption::encrypt(passphrase, password.as_bytes(), &cached_credentials)?;
     Ok(())
 }

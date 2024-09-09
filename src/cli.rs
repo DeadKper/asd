@@ -34,10 +34,13 @@ pub struct ConnectionArgs {
     pub remote: String,
     /// Login user to use for the connection
     #[arg(short, long)]
-    pub login_name: String,
+    pub login_name: Option<String>,
     /// Ask for connection password
     #[arg(short = 'k', long)]
     pub ask_pass: bool,
+    /// Port to use for the connection
+    #[arg(short, long)]
+    pub port: Option<u16>,
     /// Disabled password renewal (and connectivity test in case of --dry-run)
     #[arg(short, long)]
     pub cache: bool,
