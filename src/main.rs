@@ -194,16 +194,13 @@ fn get_password(
     args: &ConnectionArgs,
     config: &Config,
     dirs: &ConfigDirs,
-    cached: Result<&PathBuf, &anyhow::Error>,
+    cached: anyhow::Result<PathBuf>,
 ) -> anyhow::Result<String> {
     if let Ok(cached) = cached {
-        encryption::decrypt(cached, Some(passphrase))
+        encryption::decrypt(&cached, Some(passphrase))
     } else {
         if args.cache {
-            bail!(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                cached.unwrap_err().to_string()
-            ));
+            cached?;
         }
         let user = args
             .login_name
@@ -229,13 +226,14 @@ fn ssh(
     dirs: &ConfigDirs,
 ) -> anyhow::Result<()> {
     let cached = get_cached_file(args, config, dirs);
-    let password = get_password(passphrase, args, config, dirs, cached.as_ref())?;
+    let cache_found = cached.is_ok();
+    let password = get_password(passphrase, args, config, dirs, cached)?;
     let user = args
         .login_name
         .clone()
         .unwrap_or(config.default_login_user.clone());
     let port = args.port.unwrap_or(config.default_login_port);
-    if cached.is_err() || args.ask_pass {
+    if !cache_found || args.ask_pass {
         encryption::encrypt(
             passphrase,
             password.as_bytes(),
