@@ -98,7 +98,7 @@ fn register_credentials(
         io::stdin()
             .read_line(&mut buffer)
             .unwrap_or_else(|error| panic!("{error}"));
-        buffer
+        buffer.trim().to_string()
     });
     let file = dir.join(&user);
     let buffer = encryption::decrypt(&file, Some(passphrase)).unwrap_or("".to_string());
