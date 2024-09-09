@@ -208,7 +208,7 @@ fn get_password(
             .unwrap_or(config.default_login_user.clone());
         let credentials = dirs.data.join("credentials").join(&user);
         if credentials.exists() {
-            // TODO: really implement password detection this time
+            // TODO: password detection
             let password = encryption::decrypt(&credentials, Some(passphrase))?;
             Ok(password)
         } else {
@@ -247,5 +247,6 @@ fn ssh(
     if args.dry_run {
         return Ok(());
     }
+    // TODO: ssh connection
     Ok(())
 }
