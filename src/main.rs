@@ -158,7 +158,10 @@ fn get_cached_file(
     .map(|x| x.unwrap())
     .collect();
     if files.is_empty() {
-        bail!("No cached file");
+        bail!(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Credentials cache not found"
+        ));
     } else {
         let prefix_path = dirs
             .state
