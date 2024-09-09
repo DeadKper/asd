@@ -222,6 +222,45 @@ fn get_password(
     }
 }
 
+fn get_connection_data(
+    args: &ConnectionArgs,
+    config: &Config,
+    cache: Option<&PathBuf>,
+) -> anyhow::Result<(String, u16)> {
+    let user = if let Some(cache) = cache.as_ref() {
+        cache
+            .file_name()
+            .unwrap()
+            .to_os_string()
+            .into_string()
+            .unwrap()
+            .split_once("@")
+            .unwrap()
+            .0
+            .to_string()
+    } else {
+        args.login_name
+            .clone()
+            .unwrap_or(config.default_login_user.clone())
+    };
+    let port = if let Some(cache) = cache.as_ref() {
+        cache
+            .file_name()
+            .unwrap()
+            .to_os_string()
+            .into_string()
+            .unwrap()
+            .rsplit_once(":")
+            .unwrap()
+            .1
+            .to_string()
+            .parse()?
+    } else {
+        args.port.unwrap_or(config.default_login_port)
+    };
+    Ok((user, port))
+}
+
 fn ssh(
     passphrase: &str,
     args: &ConnectionArgs,
@@ -230,11 +269,7 @@ fn ssh(
 ) -> anyhow::Result<()> {
     let cache = get_cached_file(args, config, dirs).ok();
     let password = get_password(passphrase, args, config, dirs, cache.as_ref())?;
-    let user = args
-        .login_name
-        .clone()
-        .unwrap_or(config.default_login_user.clone());
-    let port = args.port.unwrap_or(config.default_login_port);
+    let (user, port) = get_connection_data(args, config, cache.as_ref())?;
     if cache.is_none() || args.ask_pass {
         encryption::encrypt(
             passphrase,
