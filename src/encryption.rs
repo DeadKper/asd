@@ -41,7 +41,7 @@ pub fn encrypt(passphrase: &str, data: &[u8], file: &PathBuf) -> anyhow::Result<
     });
     let output = child.wait_with_output()?;
     if !output.status.success() {
-        panic!("{0}", String::from_utf8(output.stderr)?);
+        panic!("{0}", String::from_utf8(output.stderr)?.trim());
     }
     let parent = file.parent().unwrap();
     if !parent.exists() {
@@ -69,7 +69,7 @@ pub fn decrypt(file: &PathBuf, passphrase: Option<&str>) -> anyhow::Result<Strin
         Command::new("gpg").arg("--decrypt").arg(file).output()?
     };
     if !output.status.success() {
-        panic!("{0}", String::from_utf8(output.stderr)?);
+        panic!("{0}", String::from_utf8(output.stderr)?.trim());
     }
     Ok(String::from_utf8(output.stdout)?.trim().to_owned())
 }
