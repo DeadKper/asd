@@ -54,7 +54,8 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     Some(config.default_login_user)
                 };
-                config.default_login_user = register_credentials(&passphrase, user, &paths.data.join("credentials"))?;
+                config.default_login_user =
+                    register_credentials(&passphrase, user, &paths.data.join("credentials"))?;
                 config.save(&config_path)?;
             }
             ConfigEnum::Edit => {
@@ -62,8 +63,13 @@ async fn main() -> anyhow::Result<()> {
                 if !path.exists() {
                     Config::reset(&path);
                 }
-                let config = edit::edit(fs::read_to_string(&path)?)?;
-                fs::write(&path, config.as_bytes())?;
+                let buffer = fs::read_to_string(&path)?;
+                let data = edit::edit(&buffer)?;
+                if buffer == data {
+                    println!("asd: {path:#?} unchanged")
+                } else {
+                    fs::write(&path, data.as_bytes())?;
+                }
             }
             ConfigEnum::Reset => {
                 Config::reset(&paths.config.join("config.toml"));
