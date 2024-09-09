@@ -2,8 +2,7 @@ mod cli;
 mod config;
 mod encryption;
 
-use anyhow::Ok;
-use cli::{CommandEnum, ConfigEnum, Parser};
+use cli::{CommandEnum, ConfigEnum, ConnectionArgs, Parser};
 use config::{Config, ConfigPaths};
 use core::panic;
 use std::{
@@ -14,7 +13,6 @@ use std::{
 };
 use strum::IntoEnumIterator;
 
-#[allow(unused)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let mut args = args().collect::<Vec<_>>();
@@ -32,17 +30,19 @@ async fn main() -> anyhow::Result<()> {
     let cli: Parser = clap::Parser::parse_from(args);
     let paths = ConfigPaths::new();
     let passfile = paths.data.join("passphrase.gpg");
+    let config_path = paths.config.join("config.toml");
 
     match cli.command {
-        CommandEnum::Ssh(args) => {}
-        CommandEnum::Sftp(args) => {}
-        CommandEnum::Put(args) => {}
-        CommandEnum::Get(args) => {}
-        CommandEnum::Exec(args) => {}
-        CommandEnum::Book(args) => {}
+        CommandEnum::Ssh(args) => {
+            ssh(&args, &Config::new(&config_path))?;
+        }
+        CommandEnum::Sftp(_args) => {}
+        CommandEnum::Put(_args) => {}
+        CommandEnum::Get(_args) => {}
+        CommandEnum::Exec(_args) => {}
+        CommandEnum::Book(_args) => {}
         CommandEnum::Config(command) => match command {
             ConfigEnum::Init => {
-                let config_path = paths.config.join("config.toml");
                 let mut config = Config::new(&config_path);
                 let passphrase = if !passfile.exists() {
                     encryption::set_passphrase(&passfile)?
@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
             ConfigEnum::Edit => {
                 let path = paths.config.join("config.toml");
                 if !path.exists() {
-                    Config::reset(&path);
+                    Config::reset(&path)?;
                 }
                 let buffer = fs::read_to_string(&path)?;
                 let data = edit::edit(&buffer)?;
@@ -72,17 +72,17 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
             ConfigEnum::Reset => {
-                Config::reset(&paths.config.join("config.toml"));
+                Config::reset(&paths.config.join("config.toml"))?;
             }
             ConfigEnum::Passphrase => {
-                encryption::set_passphrase(&paths.data.join("passphrase.gpg"));
+                encryption::set_passphrase(&paths.data.join("passphrase.gpg"))?;
             }
             ConfigEnum::Credentials { user } => {
                 register_credentials(
                     &encryption::decrypt(&passfile, None)?,
                     user,
                     &paths.data.join("credentials"),
-                );
+                )?;
             }
         },
     }
@@ -114,4 +114,8 @@ fn register_credentials(
         encryption::encrypt(passphrase, data.as_bytes(), &file)?;
     }
     Ok(user)
+}
+
+fn ssh(_args: &ConnectionArgs, _config: &Config) -> anyhow::Result<()> {
+    Ok(())
 }
