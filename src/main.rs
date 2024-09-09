@@ -169,7 +169,7 @@ fn get_cached_file(
             .into_os_string()
             .into_string()
             .unwrap();
-        let cached: Vec<PathBuf> = files
+        let cache: Vec<PathBuf> = files
             .clone()
             .into_iter()
             .filter(|file| {
@@ -181,8 +181,8 @@ fn get_cached_file(
                     .starts_with(&prefix_path)
             })
             .collect();
-        if !cached.is_empty() {
-            Ok(cached[0].clone())
+        if !cache.is_empty() {
+            Ok(cache[0].clone())
         } else {
             Ok(files[0].clone())
         }
@@ -194,13 +194,16 @@ fn get_password(
     args: &ConnectionArgs,
     config: &Config,
     dirs: &ConfigDirs,
-    cached: anyhow::Result<PathBuf>,
+    cache: Option<&PathBuf>,
 ) -> anyhow::Result<String> {
-    if let Ok(cached) = cached {
-        encryption::decrypt(&cached, Some(passphrase))
+    if let Some(cache) = cache {
+        encryption::decrypt(cache, Some(passphrase))
     } else {
         if args.cache {
-            cached?;
+            bail!(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Credentials cache not found"
+            ));
         }
         let user = args
             .login_name
@@ -225,20 +228,22 @@ fn ssh(
     config: &Config,
     dirs: &ConfigDirs,
 ) -> anyhow::Result<()> {
-    let cached = get_cached_file(args, config, dirs);
-    let cache_found = cached.is_ok();
-    let password = get_password(passphrase, args, config, dirs, cached)?;
+    let cache = get_cached_file(args, config, dirs).ok();
+    let password = get_password(passphrase, args, config, dirs, cache.as_ref())?;
     let user = args
         .login_name
         .clone()
         .unwrap_or(config.default_login_user.clone());
     let port = args.port.unwrap_or(config.default_login_port);
-    if !cache_found || args.ask_pass {
+    if cache.is_none() || args.ask_pass {
         encryption::encrypt(
             passphrase,
             password.as_bytes(),
             &dirs.state.join(format!("{user}@{}:{port}", args.remote)),
         )?;
+    }
+    if cache.is_some() {
+        // TODO: test ssh connection
     }
     if args.print {
         println!("{password}");
