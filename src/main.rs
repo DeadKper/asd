@@ -44,7 +44,6 @@ async fn main() -> anyhow::Result<()> {
             ConfigEnum::Init => {
                 let config_path = paths.config.join("config.toml");
                 let mut config = Config::new(&config_path);
-                config::create_default_dirs(&paths);
                 let passphrase = if !passfile.exists() {
                     encryption::set_passphrase(&passfile)?
                 } else {

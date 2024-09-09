@@ -79,6 +79,7 @@ impl Default for Config {
     }
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub struct ConfigPaths {
     pub config: PathBuf,
@@ -106,21 +107,4 @@ impl ConfigPaths {
             download: user_dirs.download_dir().unwrap().to_owned(),
         }
     }
-}
-
-fn create_dir(path: &PathBuf) -> anyhow::Result<()> {
-    if !path.exists() {
-        fs::create_dir_all(path)?
-    }
-    Ok(())
-}
-
-pub fn create_default_dirs(paths: &ConfigPaths) -> anyhow::Result<()> {
-    create_dir(&paths.data)?;
-    create_dir(&paths.config)?;
-    create_dir(&paths.state)?;
-    create_dir(&paths.cache)?;
-    create_dir(&paths.document)?;
-    create_dir(&paths.download)?;
-    Ok(())
 }
