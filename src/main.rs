@@ -31,7 +31,6 @@ async fn main() -> anyhow::Result<()> {
     }
     let cli: Parser = clap::Parser::parse_from(args);
     let paths = ConfigPaths::new();
-    let config = Config::new(&paths.config.join("config.toml"));
     let passfile = paths.data.join("passphrase.gpg");
 
     match cli.command {
@@ -43,13 +42,19 @@ async fn main() -> anyhow::Result<()> {
         CommandEnum::Book(args) => {}
         CommandEnum::Config(command) => match command {
             ConfigEnum::Init => {
+                let mut config = Config::new(&paths.config.join("config.toml"));
                 config::create_default_dirs(&paths);
                 let passphrase = if !passfile.exists() {
                     encryption::set_passphrase(&passfile)?
                 } else {
                     encryption::decrypt(&passfile, None)?
                 };
-                register_credentials(&passphrase, None, &paths.data.join("credentials"));
+                let user = if config.default_login_user == Config::default().default_login_user {
+                    None
+                } else {
+                    Some(config.default_login_user)
+                };
+                register_credentials(&passphrase, user, &paths.data.join("credentials"));
             }
             ConfigEnum::Edit => {
                 let path = paths.config.join("config.toml");
