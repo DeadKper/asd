@@ -2,7 +2,7 @@ mod cli;
 mod config;
 mod encryption;
 
-use anyhow::Ok;
+use anyhow::{bail, Ok};
 use cli::{CommandEnum, ConfigEnum, ConnectionArgs, Parser};
 use config::{Config, ConfigDirs};
 use core::panic;
@@ -124,25 +124,19 @@ fn register_credentials(
     Ok(user)
 }
 
-fn get_cached_password(
-    passphrase: &str,
+fn get_cached_file(
     args: &ConnectionArgs,
     config: &Config,
     dirs: &ConfigDirs,
-) -> anyhow::Result<String> {
-    if args.ask_pass {
-        let pass = scanpw!("Password: ");
-        println!();
-        return Ok(pass.trim().to_owned());
-    }
+) -> anyhow::Result<PathBuf> {
     let user = args
         .login_name
         .clone()
         .unwrap_or(config.default_login_user.clone());
     let port = args.port.unwrap_or(config.default_login_port);
-    let cached_credentials = dirs.state.join(format!("{user}@{}:{port}", args.remote));
-    if cached_credentials.exists() {
-        return encryption::decrypt(&cached_credentials, Some(passphrase));
+    let credentials = dirs.state.join(format!("{user}@{}:{port}", args.remote));
+    if credentials.exists() {
+        return Ok(credentials);
     }
     let user_glob = if args.login_name.is_some() {
         &user
@@ -163,16 +157,8 @@ fn get_cached_password(
     )?
     .map(|x| x.unwrap())
     .collect();
-    let credentials = dirs.data.join("credentials").join(&user);
     if files.is_empty() {
-        if credentials.exists() {
-            // TODO: password detection
-            encryption::decrypt(&credentials, Some(passphrase))
-        } else {
-            let pass = scanpw!("Password: ");
-            println!();
-            Ok(pass.trim().to_owned())
-        }
+        bail!("No cached file");
     } else {
         let prefix_path = dirs
             .state
@@ -193,9 +179,9 @@ fn get_cached_password(
             })
             .collect();
         if !cached.is_empty() {
-            encryption::decrypt(&cached[0], Some(passphrase))
+            Ok(cached[0].clone())
         } else {
-            encryption::decrypt(&files[0], Some(passphrase))
+            Ok(files[0].clone())
         }
     }
 }
@@ -211,8 +197,25 @@ fn ssh(
         .clone()
         .unwrap_or(config.default_login_user.clone());
     let port = args.port.unwrap_or(config.default_login_port);
-    let cached_credentials = dirs.state.join(format!("{user}@{}:{port}", args.remote));
-    let password = get_cached_password(passphrase, args, config, dirs)?;
-    encryption::encrypt(passphrase, password.as_bytes(), &cached_credentials)?;
+    let cached = get_cached_file(args, config, dirs);
+    let password = if cached.is_ok() {
+        encryption::decrypt(&cached?, Some(passphrase))?
+    } else {
+        let credentials = dirs.data.join("credentials").join(&user);
+        let cache = dirs.state.join(format!("{user}@{}:{port}", args.remote));
+        println!("{credentials:#?}");
+        if credentials.exists() {
+            // TODO: really implement password detection this time
+            let password = encryption::decrypt(&credentials, Some(passphrase))?;
+            encryption::encrypt(passphrase, password.as_bytes(), &cache)?;
+            password
+        } else {
+            let password = scanpw!("Password: ");
+            println!();
+            encryption::encrypt(passphrase, password.as_bytes(), &cache)?;
+            password
+        }
+    };
+    println!("{password}");
     Ok(())
 }
