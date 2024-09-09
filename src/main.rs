@@ -76,7 +76,14 @@ async fn main() {
 fn register_credentials(passphrase: &str, user: Option<String>, dir: &Path) -> String {
     let user: String = user.unwrap_or_else(|| {
         print!("Enter user to register credentials: ");
-        text_io::read!("{}\n")
+        io::stdout()
+            .flush()
+            .unwrap_or_else(|error| panic!("{error}"));
+        let mut buffer = String::new();
+        io::stdin()
+            .read_line(&mut buffer)
+            .unwrap_or_else(|error| panic!("{error}"));
+        buffer
     });
     let file = dir.join(&user);
     let buffer = if let Some(str) = encryption::decrypt(&file, Some(passphrase)) {
