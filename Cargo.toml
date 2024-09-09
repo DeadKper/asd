@@ -15,4 +15,3 @@ serde = { version = "1.0.210", features = ["derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
 tokio = "1.40.0"
 toml = "0.8.19"
-whoami = "1.5.2"

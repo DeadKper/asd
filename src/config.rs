@@ -4,7 +4,6 @@ use directories::{ProjectDirs, UserDirs};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{fs, path::PathBuf};
-use whoami::Platform;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Config {
@@ -48,31 +47,25 @@ impl Default for Config {
     fn default() -> Self {
         let mut login_command: HashMap<String, String> = HashMap::new();
         login_command.insert("root".to_string(), "$SHELL -l".to_string());
-        let null = if whoami::platform() == Platform::Windows {
-            "NUL"
-        } else {
-            "/dev/null"
-        }
-        .to_string();
         Self {
             ssh_options: [
                 "BatchMode=no",
                 "Compression=yes",
                 "ConnectionAttempts=1",
                 "ConnectTimeout=10",
-                &format!("GlobalKnownHostsFile={null}"),
+                "GlobalKnownHostsFile=/dev/null",
                 "LogLevel=info",
                 "NumberOfPasswordPrompts=1",
                 "PasswordAuthentication=yes",
                 "PreferredAuthentications=password",
                 "StrictHostKeyChecking=no",
-                &format!("UserKnownHostsFile={null}"),
+                "UserKnownHostsFile=/dev/null",
             ]
             .iter()
             .map(|x| x.to_string())
             .collect::<Vec<String>>(),
             default_login_port: 22,
-            default_login_user: whoami::username(),
+            default_login_user: "root".to_string(),
             cached_remote_password_expire_time: "12h".to_string(),
             login_command,
         }
