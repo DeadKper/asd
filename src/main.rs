@@ -14,6 +14,7 @@ use std::{
 };
 use strum::IntoEnumIterator;
 
+#[allow(unused)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let mut args = args().collect::<Vec<_>>();
@@ -32,11 +33,7 @@ async fn main() -> anyhow::Result<()> {
     let paths = ConfigPaths::new();
     let config = Config::new(&paths.config.join("config.toml"));
     let passfile = paths.data.join("passphrase.gpg");
-    println!("{paths:#?}");
-    println!("{config:#?}");
-    println!("{cli:#?}");
 
-    #[allow(unused)]
     match cli.command {
         CommandEnum::Ssh(args) => {}
         CommandEnum::Sftp(args) => {}
