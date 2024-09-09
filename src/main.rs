@@ -204,9 +204,11 @@ fn ssh(
     let password = if cached.is_ok() {
         encryption::decrypt(&cached?, Some(passphrase))?
     } else {
+        if args.cache {
+            cached?;
+        }
         let credentials = dirs.data.join("credentials").join(&user);
         let cache = dirs.state.join(format!("{user}@{}:{port}", args.remote));
-        println!("{credentials:#?}");
         if credentials.exists() {
             // TODO: really implement password detection this time
             let password = encryption::decrypt(&credentials, Some(passphrase))?;
@@ -219,6 +221,12 @@ fn ssh(
             password
         }
     };
-    println!("{password}");
+    if args.print {
+        println!("{password}");
+        return Ok(());
+    }
+    if args.dry_run {
+        return Ok(());
+    }
     Ok(())
 }
