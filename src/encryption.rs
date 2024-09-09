@@ -52,7 +52,7 @@ pub fn encrypt(passphrase: &str, data: &[u8], file: &PathBuf) -> anyhow::Result<
 
 pub fn decrypt(file: &PathBuf, passphrase: Option<&str>) -> anyhow::Result<String> {
     if !file.exists() {
-        bail!(Error::new(ErrorKind::NotFound, format!("file '{}' not found", file.to_owned().into_os_string().into_string().unwrap())))
+        bail!(Error::new(ErrorKind::NotFound, format!("file {file:#?} not found")))
     }
     let output = if let Some(passphrase) = passphrase {
         Command::new("gpg")
