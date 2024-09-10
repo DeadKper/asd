@@ -333,7 +333,7 @@ fn ssh(
     if cache.is_none() || args.ask_pass {
         debug!(
             "writing password (cached: {}, ask_pass: {}) for {}@{}:{}",
-            cache.is_none(),
+            cache.is_some(),
             args.ask_pass,
             user,
             args.remote,
