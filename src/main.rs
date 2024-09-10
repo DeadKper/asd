@@ -325,7 +325,14 @@ fn ssh(
     let password = get_password(passphrase, args, config, dirs, cache.as_ref())?;
     let (user, port) = get_connection_data(args, config, cache.as_ref())?;
     if cache.is_none() || args.ask_pass {
-        debug!("writing password (cached: {}, ask_pass: {}) for {}@{}:{}", cache.is_none(), args.ask_pass, user, args.remote, port);
+        debug!(
+            "writing password (cached: {}, ask_pass: {}) for {}@{}:{}",
+            cache.is_none(),
+            args.ask_pass,
+            user,
+            args.remote,
+            port
+        );
         encryption::encrypt(
             passphrase,
             password.as_bytes(),
