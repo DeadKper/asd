@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Ok};
 use log::{debug, warn};
 use scanpw::scanpw;
 use std::io::{Error, ErrorKind, Write};
@@ -41,7 +41,14 @@ pub fn encrypt(passphrase: &str, data: &[u8], file: &PathBuf) -> anyhow::Result<
     });
     let output = child.wait_with_output()?;
     if !output.status.success() {
-        bail!(anyhow!("{}", String::from_utf8(output.stderr)?.trim().rsplit_once("\n").unwrap().1));
+        bail!(anyhow!(
+            "{}",
+            String::from_utf8(output.stderr)?
+                .trim()
+                .rsplit_once("\n")
+                .unwrap()
+                .1
+        ));
     }
     let parent = file.parent().unwrap();
     if !parent.exists() {
@@ -71,7 +78,32 @@ pub fn decrypt(file: &PathBuf, passphrase: Option<&str>) -> anyhow::Result<Strin
         Command::new("gpg").arg("--decrypt").arg(file).output()?
     };
     if !output.status.success() {
-        bail!(anyhow!("{}", String::from_utf8(output.stderr)?.trim().rsplit_once("\n").unwrap().1));
+        bail!(anyhow!(
+            "{}",
+            String::from_utf8(output.stderr)?
+                .trim()
+                .rsplit_once("\n")
+                .unwrap()
+                .1
+        ));
     }
     Ok(String::from_utf8(output.stdout)?.trim().to_owned())
+}
+
+pub fn edit(file: &PathBuf, passphrase: &str) -> anyhow::Result<()> {
+    let data = decrypt(file, Some(passphrase)).unwrap_or_default();
+    let buffer = edit::edit(&data)?
+        .split("\n")
+        .map(|x| x.trim().to_owned() + "\n")
+        .collect::<String>()
+        .trim()
+        .to_owned();
+    if data == buffer {
+        debug!("buffer unchanged");
+        warn!("{file:#?} unchanged");
+    } else {
+        debug!("buffer edited");
+        encrypt(passphrase, buffer.as_bytes(), file)?;
+    }
+    Ok(())
 }

@@ -125,11 +125,17 @@ pub enum ConfigEnum {
     #[default]
     Init,
     /// Create/modify specified credentials
-    Credentials { user: Option<String> },
-    /// Set/change passphrase (use migrate if you didn't migrate manually)
+    Credentials { 
+        /// User to modify credentials to, will ask for user if not specified
+        user: Option<String>
+    },
+    /// Set/change passphrase
     Passphrase,
-    /// Open config file
-    Edit,
+    /// Edit encrypted file or config if no path was given
+    Edit {
+        /// Path to encrypted file
+        file: Option<PathBuf>
+    },
     /// Reset config file to the base configuration
     Reset,
 }

@@ -7,7 +7,7 @@ use anyhow::bail;
 use cli::{CommandEnum, ConfigEnum, ConnectionArgs, Parser};
 use config::{Config, ConfigDirs};
 use glob::glob;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use scanpw::scanpw;
 use std::{
     env::args,
@@ -95,20 +95,29 @@ async fn main() -> anyhow::Result<()> {
                         .unwrap_or_exit();
                 config.save(&config_path).unwrap_or_exit();
             }
-            ConfigEnum::Edit => {
-                let path = dirs.config.join("config.toml");
-                if !path.exists() {
-                    Config::reset(&path).unwrap_or_exit();
+            ConfigEnum::Edit { file } => match file {
+                Some(file) => {
+                    encryption::edit(
+                        &file,
+                        &encryption::decrypt(&passfile, None).unwrap_or_exit(),
+                    )
+                    .unwrap_or_exit();
                 }
-                let config_str = fs::read_to_string(&path).unwrap_or_exit();
-                let buffer = edit::edit(&config_str).unwrap_or_exit();
-                if config_str == buffer {
-                    println!("asd: {path:#?} unchanged")
-                } else {
-                    debug!("writing contents to file: {path:#?}");
-                    fs::write(&path, buffer.as_bytes()).unwrap_or_exit();
+                None => {
+                    let path = dirs.config.join("config.toml");
+                    if !path.exists() {
+                        Config::reset(&path).unwrap_or_exit();
+                    }
+                    let config_str = fs::read_to_string(&path).unwrap_or_exit();
+                    let buffer = edit::edit(&config_str).unwrap_or_exit();
+                    if config_str == buffer {
+                        warn!("{path:#?} unchanged");
+                    } else {
+                        debug!("writing config contents");
+                        fs::write(&path, buffer.as_bytes()).unwrap_or_exit();
+                    }
                 }
-            }
+            },
             ConfigEnum::Reset => {
                 Config::reset(&dirs.config.join("config.toml")).unwrap_or_exit();
             }
@@ -145,19 +154,7 @@ fn register_credentials(
         buffer.trim().to_string()
     });
     let file = dir.join(&user);
-    let credentials = encryption::decrypt(&file, Some(passphrase)).unwrap_or("".to_string());
-    let buffer = edit::edit(&credentials)?
-        .split("\n")
-        .map(|x| x.trim().to_owned() + "\n")
-        .collect::<String>()
-        .trim()
-        .to_owned();
-    if credentials == buffer {
-        println!("asd: {file:#?} unchanged")
-    } else {
-        trace!("data compare: '{credentials}' '{buffer}'");
-        encryption::encrypt(passphrase, buffer.as_bytes(), &file)?;
-    }
+    encryption::edit(&file, passphrase)?;
     Ok(user)
 }
 
