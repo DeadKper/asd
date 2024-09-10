@@ -19,7 +19,7 @@ pub fn set_passphrase(passfile: &PathBuf) -> anyhow::Result<String> {
         }
     }
     encrypt(pass1.trim(), pass1.trim().as_bytes(), passfile)?;
-    get_passphrase(passfile)
+    Ok(pass1.trim().to_owned())
 }
 
 pub fn get_passphrase(passfile: &PathBuf) -> anyhow::Result<String> {
