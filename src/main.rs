@@ -98,7 +98,7 @@ async fn main() -> anyhow::Result<()> {
                 config.default_login_user =
                     register_credentials(&passphrase, user, &dirs.data.join("credentials"))
                         .unwrap_or_exit();
-                debug!("init: setting credentials user as default");
+                debug!("init: setting user as default");
                 config.save(&config_path).unwrap_or_exit();
             }
             ConfigEnum::Edit { file } => match file {
