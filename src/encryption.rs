@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Ok};
-use log::{debug, error, warn};
+use log::{debug, warn};
 use scanpw::scanpw;
 use std::io::{Error, ErrorKind, Write};
 use std::process::{Command, Stdio};
@@ -40,8 +40,8 @@ pub fn get_passphrase(passfile: &PathBuf) -> anyhow::Result<String> {
         }
         return Ok(String::from_utf8(output.stdout)?.trim().to_owned());
     } else {
-        error!("passfile {passfile:?} not found");
-        error!("did you forget to 'asd config init' or 'asd config passphrase'?")
+        warn!("passfile {passfile:?} not found");
+        warn!("did you forget to 'asd config init' or 'asd config passphrase'?")
     }
     let pass = scanpw!("Password: ");
     println!();
