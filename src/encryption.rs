@@ -25,6 +25,7 @@ pub fn set_passphrase(passfile: &PathBuf) -> anyhow::Result<String> {
 pub fn encrypt(passphrase: &str, data: &[u8], file: &PathBuf) -> anyhow::Result<()> {
     let mut child = Command::new("gpg")
         .arg("--batch")
+        .arg("--armor")
         .arg("--passphrase")
         .arg(passphrase)
         .arg("--symmetric")
@@ -69,6 +70,7 @@ pub fn decrypt(file: &PathBuf, passphrase: Option<&str>) -> anyhow::Result<Strin
     let output = if let Some(passphrase) = passphrase {
         Command::new("gpg")
             .arg("--batch")
+            .arg("--armor")
             .arg("--passphrase")
             .arg(passphrase)
             .arg("--decrypt")
