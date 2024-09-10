@@ -64,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         CommandEnum::Ssh(args) => {
             ssh(
-                &encryption::decrypt(&passfile, None).unwrap_or_exit(),
+                &encryption::get_passphrase(&passfile).unwrap_or_exit(),
                 &args,
                 &Config::new(&config_path),
                 &dirs,
@@ -83,7 +83,7 @@ async fn main() -> anyhow::Result<()> {
                 let passphrase = if !passfile.exists() {
                     encryption::set_passphrase(&passfile).unwrap_or_exit()
                 } else {
-                    encryption::decrypt(&passfile, None).unwrap_or_exit()
+                    encryption::get_passphrase(&passfile).unwrap_or_exit()
                 };
                 let user = if config.default_login_user == Config::default().default_login_user {
                     None
@@ -99,7 +99,7 @@ async fn main() -> anyhow::Result<()> {
                 Some(file) => {
                     encryption::edit(
                         &file,
-                        &encryption::decrypt(&passfile, None).unwrap_or_exit(),
+                        &encryption::get_passphrase(&passfile).unwrap_or_exit(),
                     )
                     .unwrap_or_exit();
                 }
@@ -126,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
             }
             ConfigEnum::Credentials { user } => {
                 register_credentials(
-                    &encryption::decrypt(&passfile, None).unwrap_or_exit(),
+                    &encryption::get_passphrase(&passfile).unwrap_or_exit(),
                     user,
                     &dirs.data.join("credentials"),
                 )
@@ -240,7 +240,7 @@ fn get_password(
 ) -> anyhow::Result<String> {
     if let Some(cache) = cache {
         debug!("decrypting password cache: {cache:?}");
-        encryption::decrypt(cache, Some(passphrase))
+        encryption::decrypt(passphrase, cache)
     } else {
         if args.cache {
             debug!("forced cache usage but cache was not found");
@@ -258,7 +258,7 @@ fn get_password(
         if credentials.exists() {
             debug!("credentials found, testing passwords");
             // TODO: password detection
-            let password = encryption::decrypt(&credentials, Some(passphrase))?;
+            let password = encryption::decrypt(passphrase, &credentials)?;
             Ok(password)
         } else {
             debug!("no cache or credentials found, asking user for password");

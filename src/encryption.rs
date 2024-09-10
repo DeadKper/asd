@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Ok};
-use log::{debug, warn};
+use log::{debug, error, warn};
 use scanpw::scanpw;
 use std::io::{Error, ErrorKind, Write};
 use std::process::{Command, Stdio};
@@ -19,7 +19,33 @@ pub fn set_passphrase(passfile: &PathBuf) -> anyhow::Result<String> {
         }
     }
     encrypt(pass1.trim(), pass1.trim().as_bytes(), passfile)?;
-    decrypt(passfile, None)
+    get_passphrase(passfile)
+}
+
+pub fn get_passphrase(passfile: &PathBuf) -> anyhow::Result<String> {
+    if passfile.exists() {
+        let output = Command::new("gpg")
+            .arg("--decrypt")
+            .arg(passfile)
+            .output()?;
+        if !output.status.success() {
+            bail!(anyhow!(
+                "{}",
+                String::from_utf8(output.stderr)?
+                    .trim()
+                    .rsplit_once("\n")
+                    .unwrap()
+                    .1
+            ));
+        }
+        return Ok(String::from_utf8(output.stdout)?.trim().to_owned());
+    } else {
+        error!("passfile {passfile:?} not found");
+        error!("did you forget to 'asd config init' or 'asd config passphrase'?")
+    }
+    let pass = scanpw!("Password: ");
+    println!();
+    Ok(pass)
 }
 
 pub fn encrypt(passphrase: &str, data: &[u8], file: &PathBuf) -> anyhow::Result<()> {
@@ -60,25 +86,20 @@ pub fn encrypt(passphrase: &str, data: &[u8], file: &PathBuf) -> anyhow::Result<
     Ok(fs::write(file, output.stdout)?)
 }
 
-pub fn decrypt(file: &PathBuf, passphrase: Option<&str>) -> anyhow::Result<String> {
+pub fn decrypt(passphrase: &str, file: &PathBuf) -> anyhow::Result<String> {
     if !file.exists() {
         bail!(Error::new(
             ErrorKind::NotFound,
             format!("file {file:#?} not found")
         ))
     }
-    let output = if let Some(passphrase) = passphrase {
-        Command::new("gpg")
-            .arg("--batch")
-            .arg("--armor")
-            .arg("--passphrase")
-            .arg(passphrase)
-            .arg("--decrypt")
-            .arg(file)
-            .output()?
-    } else {
-        Command::new("gpg").arg("--decrypt").arg(file).output()?
-    };
+    let output = Command::new("gpg")
+        .arg("--batch")
+        .arg("--passphrase")
+        .arg(passphrase)
+        .arg("--decrypt")
+        .arg(file)
+        .output()?;
     if !output.status.success() {
         bail!(anyhow!(
             "{}",
@@ -93,7 +114,7 @@ pub fn decrypt(file: &PathBuf, passphrase: Option<&str>) -> anyhow::Result<Strin
 }
 
 pub fn edit(file: &PathBuf, passphrase: &str) -> anyhow::Result<()> {
-    let data = decrypt(file, Some(passphrase)).unwrap_or_default();
+    let data = decrypt(passphrase, file).unwrap_or_default();
     let buffer = edit::edit(&data)?
         .split("\n")
         .map(|x| x.trim().to_owned() + "\n")
