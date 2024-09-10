@@ -1,12 +1,13 @@
 mod cli;
 mod config;
 mod encryption;
+mod macros;
 
 use anyhow::bail;
 use cli::{CommandEnum, ConfigEnum, ConnectionArgs, Parser};
 use config::{Config, ConfigDirs};
-use core::panic;
 use glob::glob;
+use log::{debug, info, trace};
 use scanpw::scanpw;
 use std::{
     env::args,
@@ -16,9 +17,27 @@ use std::{
 };
 use strum::IntoEnumIterator;
 
+trait LogFail {
+    fn fail(self) -> Self;
+}
+
+impl<T, E> LogFail for Result<T, E>
+where
+    E: std::fmt::Display,
+{
+    fn fail(self) -> Self {
+        if let Err(e) = &self {
+            fatal!("{e}");
+        }
+        self
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    pretty_env_logger::init();
     let mut args = args().collect::<Vec<_>>();
+    trace!("original args: {args:?}");
     if args.len() > 1 {
         // check if default subcommand is needed
         let mut valid = ["help", "-h", "--help", "-V", "--version"]
@@ -27,22 +46,30 @@ async fn main() -> anyhow::Result<()> {
             .collect::<Vec<String>>();
         valid.extend(CommandEnum::iter().map(|x| x.to_string().to_lowercase()));
         if !valid.contains(&args[1]) {
+            info!(
+                "no valid subcommand/flag for first argument ({}) using default subcommand",
+                args[1]
+            );
             args.insert(1, "ssh".to_string());
+            trace!("default subcommand args: {args:?}");
         }
     }
     let cli: Parser = clap::Parser::parse_from(args);
+    trace!("parsed args: {cli:?}");
     let dirs = ConfigDirs::new();
+    trace!("dirs structure: {dirs:?}");
     let passfile = dirs.data.join("passphrase.gpg");
     let config_path = dirs.config.join("config.toml");
 
     match cli.command {
         CommandEnum::Ssh(args) => {
             ssh(
-                &encryption::decrypt(&passfile, None)?,
+                &encryption::decrypt(&passfile, None).fail()?,
                 &args,
                 &Config::new(&config_path),
                 &dirs,
-            )?;
+            )
+            .fail()?;
         }
         CommandEnum::Sftp(_args) => {}
         CommandEnum::Put(_args) => {}
@@ -52,10 +79,11 @@ async fn main() -> anyhow::Result<()> {
         CommandEnum::Config(command) => match command {
             ConfigEnum::Init => {
                 let mut config = Config::new(&config_path);
+                trace!("init config: {config:?}");
                 let passphrase = if !passfile.exists() {
-                    encryption::set_passphrase(&passfile)?
+                    encryption::set_passphrase(&passfile).fail()?
                 } else {
-                    encryption::decrypt(&passfile, None)?
+                    encryption::decrypt(&passfile, None).fail()?
                 };
                 let user = if config.default_login_user == Config::default().default_login_user {
                     None
@@ -63,34 +91,37 @@ async fn main() -> anyhow::Result<()> {
                     Some(config.default_login_user)
                 };
                 config.default_login_user =
-                    register_credentials(&passphrase, user, &dirs.data.join("credentials"))?;
-                config.save(&config_path)?;
+                    register_credentials(&passphrase, user, &dirs.data.join("credentials"))
+                        .fail()?;
+                config.save(&config_path).fail()?;
             }
             ConfigEnum::Edit => {
                 let path = dirs.config.join("config.toml");
                 if !path.exists() {
-                    Config::reset(&path)?;
+                    Config::reset(&path).fail()?;
                 }
-                let buffer = fs::read_to_string(&path)?;
-                let data = edit::edit(&buffer)?;
-                if buffer == data {
+                let config_str = fs::read_to_string(&path).fail()?;
+                let buffer = edit::edit(&config_str).fail()?;
+                if config_str == buffer {
                     println!("asd: {path:#?} unchanged")
                 } else {
-                    fs::write(&path, data.as_bytes())?;
+                    debug!("writing contents to file: {path:#?}");
+                    fs::write(&path, buffer.as_bytes()).fail()?;
                 }
             }
             ConfigEnum::Reset => {
-                Config::reset(&dirs.config.join("config.toml"))?;
+                Config::reset(&dirs.config.join("config.toml")).fail()?;
             }
             ConfigEnum::Passphrase => {
-                encryption::set_passphrase(&dirs.data.join("passphrase.gpg"))?;
+                encryption::set_passphrase(&dirs.data.join("passphrase.gpg")).fail()?;
             }
             ConfigEnum::Credentials { user } => {
                 register_credentials(
-                    &encryption::decrypt(&passfile, None)?,
+                    &encryption::decrypt(&passfile, None).fail()?,
                     user,
                     &dirs.data.join("credentials"),
-                )?;
+                )
+                .fail()?;
             }
         },
     }
@@ -106,20 +137,26 @@ fn register_credentials(
         print!("Enter user to register credentials: ");
         io::stdout()
             .flush()
-            .unwrap_or_else(|error| panic!("{error}"));
+            .unwrap_or_else(|error| fatal!("{error}"));
         let mut buffer = String::new();
         io::stdin()
             .read_line(&mut buffer)
-            .unwrap_or_else(|error| panic!("{error}"));
+            .unwrap_or_else(|error| fatal!("{error}"));
         buffer.trim().to_string()
     });
     let file = dir.join(&user);
-    let buffer = encryption::decrypt(&file, Some(passphrase)).unwrap_or("".to_string());
-    let data = edit::edit(&buffer)?;
-    if buffer == data {
+    let credentials = encryption::decrypt(&file, Some(passphrase)).unwrap_or("".to_string());
+    let buffer = edit::edit(&credentials)?
+        .split("\n")
+        .map(|x| x.trim().to_owned() + "\n")
+        .collect::<String>()
+        .trim()
+        .to_owned();
+    if credentials == buffer {
         println!("asd: {file:#?} unchanged")
     } else {
-        encryption::encrypt(passphrase, data.as_bytes(), &file)?;
+        trace!("data compare: '{credentials}' '{buffer}'");
+        encryption::encrypt(passphrase, buffer.as_bytes(), &file)?;
     }
     Ok(user)
 }
@@ -135,7 +172,9 @@ fn get_cached_file(
         .unwrap_or(config.default_login_user.clone());
     let port = args.port.unwrap_or(config.default_login_port);
     let credentials = dirs.state.join(format!("{user}@{}:{port}", args.remote));
+    trace!("strict cached filed path: {credentials:?}");
     if credentials.exists() {
+        debug!("found strict match cache: {credentials:?}");
         return Ok(credentials);
     }
     let user_glob = if args.login_name.is_some() {
@@ -148,19 +187,22 @@ fn get_cached_file(
     } else {
         "*"
     };
-    let files: Vec<PathBuf> = glob(
-        dirs.state
-            .join(format!("{}@{}:{}", user_glob, args.remote, port_glob))
-            .into_os_string()
-            .to_str()
-            .unwrap(),
-    )?
-    .map(|x| x.unwrap())
-    .collect();
+    let glob_pattern = dirs
+        .state
+        .join(format!("{}@{}:{}", &user_glob, args.remote, &port_glob))
+        .into_os_string()
+        .into_string()
+        .unwrap();
+    trace!("glob pattern: {glob_pattern}");
+    let files: Vec<PathBuf> = glob(&glob_pattern)?
+        .map(|x| x.unwrap_or_else(|err| fatal!("{err}")))
+        .collect();
+    trace!("glob results: {files:?}");
     if files.is_empty() {
+        debug!("no cached files with loose globbing");
         bail!(std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            "Credentials cache not found"
+            "credentials cache not found"
         ));
     } else {
         let prefix_path = dirs
@@ -181,9 +223,12 @@ fn get_cached_file(
                     .starts_with(&prefix_path)
             })
             .collect();
+        trace!("filter prefix: {prefix_path}");
         if !cache.is_empty() {
+            debug!("found default user cache: {:?}", cache[0]);
             Ok(cache[0].clone())
         } else {
+            debug!("found loose cache: {:?}", files[0]);
             Ok(files[0].clone())
         }
     }
@@ -197,12 +242,14 @@ fn get_password(
     cache: Option<&PathBuf>,
 ) -> anyhow::Result<String> {
     if let Some(cache) = cache {
+        debug!("decrypting password cache: {cache:?}");
         encryption::decrypt(cache, Some(passphrase))
     } else {
         if args.cache {
+            debug!("forced cache usage but cache was not found");
             bail!(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                "Credentials cache not found"
+                "credentials cache not found"
             ));
         }
         let user = args
@@ -210,11 +257,14 @@ fn get_password(
             .clone()
             .unwrap_or(config.default_login_user.clone());
         let credentials = dirs.data.join("credentials").join(&user);
+        trace!("saved credentials: {credentials:?}");
         if credentials.exists() {
+            debug!("credentials found, testing passwords");
             // TODO: password detection
             let password = encryption::decrypt(&credentials, Some(passphrase))?;
             Ok(password)
         } else {
+            debug!("no cache or credentials found, asking user for password");
             let password = scanpw!("Password: ");
             println!();
             Ok(password)
@@ -228,6 +278,7 @@ fn get_connection_data(
     cache: Option<&PathBuf>,
 ) -> anyhow::Result<(String, u16)> {
     let user = if let Some(cache) = cache.as_ref() {
+        debug!("getting user from cache");
         cache
             .file_name()
             .unwrap()
@@ -239,11 +290,13 @@ fn get_connection_data(
             .0
             .to_string()
     } else {
+        debug!("getting user from args/config");
         args.login_name
             .clone()
             .unwrap_or(config.default_login_user.clone())
     };
     let port = if let Some(cache) = cache.as_ref() {
+        debug!("getting port from cache");
         cache
             .file_name()
             .unwrap()
@@ -256,6 +309,7 @@ fn get_connection_data(
             .to_string()
             .parse()?
     } else {
+        debug!("getting port from args/config");
         args.port.unwrap_or(config.default_login_port)
     };
     Ok((user, port))
@@ -271,6 +325,7 @@ fn ssh(
     let password = get_password(passphrase, args, config, dirs, cache.as_ref())?;
     let (user, port) = get_connection_data(args, config, cache.as_ref())?;
     if cache.is_none() || args.ask_pass {
+        debug!("writing password (cached: {}, ask_pass: {}) for {}@{}:{}", cache.is_none(), args.ask_pass, user, args.remote, port);
         encryption::encrypt(
             passphrase,
             password.as_bytes(),
@@ -278,6 +333,7 @@ fn ssh(
         )?;
     }
     if cache.is_some() {
+        debug!("password was cached, testing connectivity");
         // TODO: test ssh connection
     }
     if args.print {

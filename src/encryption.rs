@@ -1,5 +1,5 @@
-use anyhow::bail;
-use core::panic;
+use anyhow::{anyhow, bail};
+use log::{debug, warn};
 use scanpw::scanpw;
 use std::io::{Error, ErrorKind, Write};
 use std::process::{Command, Stdio};
@@ -15,7 +15,7 @@ pub fn set_passphrase(passfile: &PathBuf) -> anyhow::Result<String> {
         if pass1 == pass2 {
             break;
         } else {
-            println!("Passwords do not match! Try again.");
+            warn!("Passwords do not match!");
         }
     }
     encrypt(pass1.trim(), pass1.trim().as_bytes(), passfile)?;
@@ -37,16 +37,18 @@ pub fn encrypt(passphrase: &str, data: &[u8], file: &PathBuf) -> anyhow::Result<
     std::thread::spawn(move || {
         stdin
             .write_all(&data_clone)
-            .expect("Failed to write to stdin");
+            .expect("failed to write to stdin");
     });
     let output = child.wait_with_output()?;
     if !output.status.success() {
-        panic!("{0}", String::from_utf8(output.stderr)?.trim());
+        bail!(anyhow!("{}", String::from_utf8(output.stderr)?.trim().rsplit_once("\n").unwrap().1));
     }
     let parent = file.parent().unwrap();
     if !parent.exists() {
+        debug!("creating dirs: {parent:?}");
         fs::create_dir_all(parent)?
     }
+    debug!("writing contents to file: {file:?}");
     Ok(fs::write(file, output.stdout)?)
 }
 
@@ -69,7 +71,7 @@ pub fn decrypt(file: &PathBuf, passphrase: Option<&str>) -> anyhow::Result<Strin
         Command::new("gpg").arg("--decrypt").arg(file).output()?
     };
     if !output.status.success() {
-        panic!("{0}", String::from_utf8(output.stderr)?.trim());
+        bail!(anyhow!("{}", String::from_utf8(output.stderr)?.trim().rsplit_once("\n").unwrap().1));
     }
     Ok(String::from_utf8(output.stdout)?.trim().to_owned())
 }

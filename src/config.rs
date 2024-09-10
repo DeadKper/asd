@@ -1,9 +1,11 @@
 use anyhow::Ok;
-use core::panic;
 use directories::{ProjectDirs, UserDirs};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{fs, path::PathBuf};
+
+use crate::fatal;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Config {
@@ -36,6 +38,7 @@ impl Config {
     pub fn save(&self, path: &PathBuf) -> anyhow::Result<()> {
         let dir_path = std::path::Path::new(path).parent().unwrap();
         if !dir_path.exists() {
+            debug!("creating dirs for path: {dir_path:?}");
             fs::create_dir_all(dir_path)?;
         }
         fs::write(path, toml::to_string_pretty(self)?)?;
@@ -86,7 +89,7 @@ pub struct ConfigDirs {
 impl ConfigDirs {
     pub fn new() -> Self {
         let proj_dirs = ProjectDirs::from("com.deadkper", "Coppel", "asd")
-            .unwrap_or_else(|| panic!("was not able to set project dirs"));
+            .unwrap_or_else(|| fatal!("Was not able to set project dirs structure"));
         let user_dirs = UserDirs::new().unwrap();
         Self {
             data: proj_dirs.data_dir().to_owned(),
