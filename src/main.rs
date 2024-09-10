@@ -17,19 +17,19 @@ use std::{
 };
 use strum::IntoEnumIterator;
 
-trait LogFail {
-    fn fail(self) -> Self;
+trait UnwrapExit<T> {
+    fn unwrap_or_exit(self) -> T;
 }
 
-impl<T, E> LogFail for Result<T, E>
+impl<T, E> UnwrapExit<T> for Result<T, E>
 where
     E: std::fmt::Display,
 {
-    fn fail(self) -> Self {
-        if let Err(e) = &self {
-            fatal!("{e}");
+    fn unwrap_or_exit(self) -> T {
+        match self {
+            Ok(v) => v,
+            Err(e) => fatal!("{e}"),
         }
-        self
     }
 }
 
@@ -64,12 +64,12 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         CommandEnum::Ssh(args) => {
             ssh(
-                &encryption::decrypt(&passfile, None).fail()?,
+                &encryption::decrypt(&passfile, None).unwrap_or_exit(),
                 &args,
                 &Config::new(&config_path),
                 &dirs,
             )
-            .fail()?;
+            .unwrap_or_exit();
         }
         CommandEnum::Sftp(_args) => {}
         CommandEnum::Put(_args) => {}
@@ -81,9 +81,9 @@ async fn main() -> anyhow::Result<()> {
                 let mut config = Config::new(&config_path);
                 trace!("init config: {config:?}");
                 let passphrase = if !passfile.exists() {
-                    encryption::set_passphrase(&passfile).fail()?
+                    encryption::set_passphrase(&passfile).unwrap_or_exit()
                 } else {
-                    encryption::decrypt(&passfile, None).fail()?
+                    encryption::decrypt(&passfile, None).unwrap_or_exit()
                 };
                 let user = if config.default_login_user == Config::default().default_login_user {
                     None
@@ -92,36 +92,36 @@ async fn main() -> anyhow::Result<()> {
                 };
                 config.default_login_user =
                     register_credentials(&passphrase, user, &dirs.data.join("credentials"))
-                        .fail()?;
-                config.save(&config_path).fail()?;
+                        .unwrap_or_exit();
+                config.save(&config_path).unwrap_or_exit();
             }
             ConfigEnum::Edit => {
                 let path = dirs.config.join("config.toml");
                 if !path.exists() {
-                    Config::reset(&path).fail()?;
+                    Config::reset(&path).unwrap_or_exit();
                 }
-                let config_str = fs::read_to_string(&path).fail()?;
-                let buffer = edit::edit(&config_str).fail()?;
+                let config_str = fs::read_to_string(&path).unwrap_or_exit();
+                let buffer = edit::edit(&config_str).unwrap_or_exit();
                 if config_str == buffer {
                     println!("asd: {path:#?} unchanged")
                 } else {
                     debug!("writing contents to file: {path:#?}");
-                    fs::write(&path, buffer.as_bytes()).fail()?;
+                    fs::write(&path, buffer.as_bytes()).unwrap_or_exit();
                 }
             }
             ConfigEnum::Reset => {
-                Config::reset(&dirs.config.join("config.toml")).fail()?;
+                Config::reset(&dirs.config.join("config.toml")).unwrap_or_exit();
             }
             ConfigEnum::Passphrase => {
-                encryption::set_passphrase(&dirs.data.join("passphrase.gpg")).fail()?;
+                encryption::set_passphrase(&dirs.data.join("passphrase.gpg")).unwrap_or_exit();
             }
             ConfigEnum::Credentials { user } => {
                 register_credentials(
-                    &encryption::decrypt(&passfile, None).fail()?,
+                    &encryption::decrypt(&passfile, None).unwrap_or_exit(),
                     user,
                     &dirs.data.join("credentials"),
                 )
-                .fail()?;
+                .unwrap_or_exit();
             }
         },
     }
