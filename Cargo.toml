@@ -9,6 +9,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.87"
+async-trait = "0.1.82"
 clap = { version = "4.5.17", features = ["derive"] }
 directories = "5.0.1"
 edit = "0.1.5"
@@ -19,5 +20,7 @@ russh = "0.45.0"
 scanpw = "1.0.0"
 serde = { version = "1.0.210", features = ["derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
-tokio = "1.40.0"
+termion = "4.0.2"
+tokio = { version = "1.40.0", features = ["io-std"] }
+tokio-fd = "0.3.0"
 toml = "0.8.19"

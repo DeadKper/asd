@@ -2,12 +2,14 @@ mod cli;
 mod config;
 mod encryption;
 mod macros;
+mod ssh;
 
+use crate::ssh::Session;
 use anyhow::bail;
 use cli::{CommandEnum, ConfigEnum, ConnectionArgs, Parser};
 use config::{Config, ConfigDirs};
 use glob::glob;
-use log::{debug, info, trace, warn};
+use log::{debug, trace, warn};
 use scanpw::scanpw;
 use std::{
     env::args,
@@ -16,6 +18,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use strum::IntoEnumIterator;
+use termion::raw::IntoRawMode;
 
 trait UnwrapExit<T> {
     fn unwrap_or_exit(self) -> T;
@@ -46,10 +49,7 @@ async fn main() -> anyhow::Result<()> {
             .collect::<Vec<String>>();
         valid.extend(CommandEnum::iter().map(|x| x.to_string().to_lowercase()));
         if !valid.contains(&args[1]) {
-            info!(
-                "no valid subcommand/flag for first argument ({}) using default subcommand",
-                args[1]
-            );
+            debug!("no valid subcommand/flag for first argument using default subcommand");
             args.insert(1, "ssh".to_string());
             trace!("default subcommand args: {args:?}");
         }
@@ -69,6 +69,7 @@ async fn main() -> anyhow::Result<()> {
                 &Config::new(&config_path),
                 &dirs,
             )
+            .await
             .unwrap_or_exit();
         }
         CommandEnum::Sftp(_args) => {}
@@ -321,7 +322,7 @@ fn get_connection_data(
     Ok((user, port))
 }
 
-fn ssh(
+async fn ssh(
     passphrase: &str,
     args: &ConnectionArgs,
     config: &Config,
@@ -356,6 +357,12 @@ fn ssh(
     if args.dry_run {
         return Ok(());
     }
-    // TODO: ssh connection
+    let mut ssh = Session::connect(user, password, (args.remote.clone(), port)).await?;
+    let code = {
+        let _raw_term = std::io::stdout().into_raw_mode()?;
+        ssh.call("$SHELL -l").await?
+    };
+    debug!("exit code {code}");
+    ssh.close().await?;
     Ok(())
 }
