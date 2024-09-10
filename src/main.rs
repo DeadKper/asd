@@ -79,24 +79,31 @@ async fn main() -> anyhow::Result<()> {
         CommandEnum::Config(command) => match command {
             ConfigEnum::Init => {
                 let mut config = Config::new(&config_path);
-                trace!("init config: {config:?}");
+                trace!("init: {config:?}");
                 let passphrase = if !passfile.exists() {
+                    debug!("init: no passfile, creating passphrase file");
+                    println!("Creating passphrase");
                     encryption::set_passphrase(&passfile).unwrap_or_exit()
                 } else {
+                    debug!("init: getting passphrase from passfile");
                     encryption::get_passphrase(&passfile).unwrap_or_exit()
                 };
                 let user = if config.default_login_user == Config::default().default_login_user {
+                    debug!("init: creating default user credentials");
                     None
                 } else {
+                    debug!("init: using configured user");
                     Some(config.default_login_user)
                 };
                 config.default_login_user =
                     register_credentials(&passphrase, user, &dirs.data.join("credentials"))
                         .unwrap_or_exit();
+                debug!("init: setting credentials user as default");
                 config.save(&config_path).unwrap_or_exit();
             }
             ConfigEnum::Edit { file } => match file {
                 Some(file) => {
+                    debug!("edit: editing user given file");
                     encryption::edit(
                         &file,
                         &encryption::get_passphrase(&passfile).unwrap_or_exit(),
@@ -104,8 +111,10 @@ async fn main() -> anyhow::Result<()> {
                     .unwrap_or_exit();
                 }
                 None => {
+                    debug!("edit: editing configuration");
                     let path = dirs.config.join("config.toml");
                     if !path.exists() {
+                        debug!("edit: creating default configuration");
                         Config::reset(&path).unwrap_or_exit();
                     }
                     let config_str = fs::read_to_string(&path).unwrap_or_exit();
